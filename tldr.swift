@@ -38,7 +38,7 @@ func getCommands() -> [Command] {
     var commands = [Command]()
     do {
         let dict = try NSJSONSerialization.JSONObjectWithData(jsonData!, options: .AllowFragments)
-        if let commandsArray = dict as? NSArray {
+        if let commandsArray = dict["commands"] as? NSArray {
             for command in commandsArray {
                 let name = command["name"] as? String
                 let platforms = command["platform"] as? [String]
