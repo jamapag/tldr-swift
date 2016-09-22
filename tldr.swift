@@ -1,4 +1,4 @@
-#!/usr/bin/env swift
+#!/usr/bin/env xcrun --toolchain XcodeDefault.xctoolchain swift
 
 import Foundation
 
@@ -32,18 +32,22 @@ struct Styles {
 func getCommands() -> [Command] {
     // TODO: cache commands list.
     let jsonPath = "https://raw.githubusercontent.com/tldr-pages/tldr-pages.github.io/master/assets/index.json"
-    let jsonURL = NSURL(string: jsonPath)
-    let jsonData = NSData(contentsOfURL: jsonURL!)
+    let jsonURL = URL(string: jsonPath)
+    let jsonData = try! Data(contentsOf: jsonURL!)
+
 
     var commands = [Command]()
     do {
-        let dict = try NSJSONSerialization.JSONObjectWithData(jsonData!, options: .AllowFragments)
-        if let commandsArray = dict["commands"] as? NSArray {
-            for command in commandsArray {
-                let name = command["name"] as? String
-                let platforms = command["platform"] as? [String]
-                let command = Command(name: name!, platforms: platforms!)
-                commands.append(command)
+        if let dict = try JSONSerialization.jsonObject(with: jsonData, options: .allowFragments) as? [String: Any] {
+            if let commandsArray = dict["commands"] as? [Any] {
+                for obj in commandsArray {
+                    if let cmdDict = obj as? [String: Any] {
+                        let name = cmdDict["name"] as? String
+                        let platforms = cmdDict["platform"] as? [String]
+                        let command = Command(name: name!, platforms: platforms!)
+                        commands.append(command)
+                    }
+                }
             }
         }
     } catch {
@@ -59,10 +63,10 @@ func getPage(command: Command, platform: String) -> [String]? {
          platformArg = platform
     }
     let pagePath = "https://raw.githubusercontent.com/tldr-pages/tldr/master/pages/\(platformArg)/\(command.name).md"
-    let pageURL = NSURL(string: pagePath)
+    let pageURL = URL(string: pagePath)
     do {
-        let content = try NSString(contentsOfURL: pageURL!, encoding: NSUTF8StringEncoding)
-        let lines = content.componentsSeparatedByString("\n")
+        let content = try NSString(contentsOf: pageURL!, encoding: String.Encoding.utf8.rawValue)
+        let lines = content.components(separatedBy: "\n")
         return lines
     } catch {
         print("Error loading page content.")
@@ -71,13 +75,13 @@ func getPage(command: Command, platform: String) -> [String]? {
     return nil
 }
 
-func renderPageContent(pageContent: [String]) {
+func renderPageContent(_ pageContent: [String]) {
     for line in pageContent {
         renderLine(line)
     }
 }
 
-func renderLine(line: String) {
+func renderLine(_ line: String) {
     if line.hasPrefix("#") {
         printTitle(line)
     } else if line.hasPrefix(">") {
@@ -91,25 +95,25 @@ func renderLine(line: String) {
     }
 }
 
-func printTitle(line: String) {
-    let title = line.stringByReplacingOccurrencesOfString("# ", withString: "\n" + Styles.bold) + Styles.end
+func printTitle(_ line: String) {
+    let title = line.replacingOccurrences(of: "# ", with: "\n" + Styles.bold) + Styles.end
     print(title)
 }
 
-func printExplanation(line: String) {
+func printExplanation(_ line: String) {
     let explanation = String(line.characters.dropFirst(2))
     print(explanation)
 }
 
-func printExampleComment(line: String) {
+func printExampleComment(_ line: String) {
     print(Styles.green + Styles.bold + line + Styles.end)
 }
 
-func printCodeExample(line: String) {
+func printCodeExample(_ line: String) {
     let trimmed = String(line.characters.dropLast());
-    let shifted = trimmed.stringByReplacingOccurrencesOfString("`", withString: "  ")
-    var result = shifted.stringByReplacingOccurrencesOfString("{{", withString: "" + Styles.end + Styles.blueUnerline)
-    result = result.stringByReplacingOccurrencesOfString("}}", withString: "" + Styles.end + Styles.boldRed)
+    let shifted = trimmed.replacingOccurrences(of: "`", with: "  ")
+    var result = shifted.replacingOccurrences(of: "{{", with: "" + Styles.end + Styles.blueUnerline)
+    result = result.replacingOccurrences(of: "}}", with: "" + Styles.end + Styles.boldRed)
     print(Styles.boldRed + result + Styles.end)
 }
 
@@ -118,8 +122,7 @@ func printUsage() {
     print("    " + Styles.boldRed + "tldr " + Styles.end + Styles.blueUnerline + "<command>" + Styles.end)
     print("    " + Styles.boldRed + "tldr " + Styles.end + Styles.blueUnerline + "<command>" + Styles.end + Styles.boldRed + " --os=" + Styles.end + Styles.blueUnerline + "linux" + Styles.end)
 }
-
-if Process.arguments.count < 2 {
+if CommandLine.arguments.count < 2 {
     printUsage()
     exit(1)
 }
@@ -127,7 +130,7 @@ if Process.arguments.count < 2 {
 var command: String? = nil
 var platform = Platform.osx
 
-for (index, argument) in Process.arguments.enumerate() {
+for (index, argument) in CommandLine.arguments.enumerated() {
     if index == 0 {
         continue
     }
@@ -167,6 +170,6 @@ if filtered.count == 0 {
     exit(404)
 }
 
-let pageContent = getPage(filtered[0], platform: platform.rawValue)
+let pageContent = getPage(command: filtered[0], platform: platform.rawValue)
 renderPageContent(pageContent!)
 
